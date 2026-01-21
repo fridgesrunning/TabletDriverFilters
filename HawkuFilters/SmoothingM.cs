@@ -3,13 +3,14 @@ using System.Numerics;
 using OpenTabletDriver.Plugin.Attributes;
 using OpenTabletDriver.Plugin.Output;
 using OpenTabletDriver.Plugin.Tablet;
+using OpenTabletDriver.Plugin.Timing;
 
 namespace TabletDriverFilters.Hawku
 {
     [PluginName("Hawku Smoothing Filter (M)")]
     public class SmoothingM : MillimeterAsyncPositionedPipelineElement
     {
-        public override PipelinePosition Position => PipelinePosition.PreTransform;
+        public override PipelinePosition Position => PipelinePosition.PostTransform;
 
         [SliderProperty("Latency", 0.0f, 1000.0f, 2.0f), DefaultPropertyValue(2f)]
         [ToolTip(
@@ -24,19 +25,23 @@ namespace TabletDriverFilters.Hawku
         )]
         public float Latency { set; get; }
 
-        private const float THRESHOLD = 0.63f;
-        private float timerInterval => 1000 / Frequency;
+        [Property("Wire"), DefaultPropertyValue(true), ToolTip
+        (
+            "Has multiple uses: acts as the extra frames option, also ensures secure wiring after another async filter when set to 0hz."
+        )]
+        public bool Wire { set; get; }
 
-        private float weight;
-        private DateTime? lastFilterTime;
-        private Vector3 mmScale;
-        private Vector3 targetPos;
-        private Vector3 lastPos;
 
         protected override void ConsumeState()
         {
-            if (State is ITabletReport report)
-                this.targetPos = new Vector3(report.Position, report.Pressure) * mmScale;
+            if (State is ITabletReport report) {
+                consumeDelta = (float)reportStopwatch.Restart().TotalMilliseconds;
+                pos0 = report.Position;
+                this.targetPos = new Vector3(pos0, report.Pressure) * mmScale;
+
+                if (Wire)
+                    UpdateState();
+            }
             else
                 OnEmit();
         }
@@ -47,6 +52,7 @@ namespace TabletDriverFilters.Hawku
             {
                 var newPoint = Filter(this.targetPos) / mmScale;
                 report.Position = new Vector2(newPoint.X, newPoint.Y);
+                Console.WriteLine(report.Position - pos0);
                 report.Pressure = (uint)newPoint.Z;
                 State = report;
 
@@ -56,28 +62,34 @@ namespace TabletDriverFilters.Hawku
 
         public Vector3 Filter(Vector3 point)
         {
-            var timeDelta = DateTime.Now - this.lastFilterTime;
+            updateDelta = (float)updateStopwatch.Restart().TotalMilliseconds;
             // If a time difference hasn't been established or it has been 100 milliseconds since the last filter
-            if (timeDelta == null || timeDelta.Value.TotalMilliseconds > 100)
+            if (updateDelta == 0 || updateDelta > 100)
             {
                 this.lastPos = point;
-                this.lastFilterTime = DateTime.Now;
                 SetWeight(Latency);
                 return point;
             }
             else
             {
+                updateMsAvg += ((updateDelta - updateMsAvg) * 0.1f);
                 Vector3 delta = point - this.lastPos;
-
-                this.lastPos += delta * weight;
-                this.lastFilterTime = DateTime.Now;
+                float currWeight = weight;
+                if (Wire && Frequency > 0)
+                    currWeight *= (updateDelta / updateMsAvg) * updateMsAvg;
+                this.lastPos += delta * currWeight;
+                Console.WriteLine(updateMsAvg);
                 return this.lastPos;
+
             }
         }
 
         private void SetWeight(float latency)
         {
-            float stepCount = latency / timerInterval;
+            float stepCount;
+            if (!Wire)
+                stepCount = latency / timerInterval;
+            else stepCount = latency;
             float target = 1 - THRESHOLD;
             this.weight = 1f - (1f / MathF.Pow(1f / target, 1f / stepCount));
         }
@@ -92,5 +104,24 @@ namespace TabletDriverFilters.Hawku
                 Z = 1  // passthrough
             };
         }
+
+        Vector2 pos0;
+
+        private HPETDeltaStopwatch reportStopwatch = new HPETDeltaStopwatch();
+        private HPETDeltaStopwatch updateStopwatch = new HPETDeltaStopwatch();
+
+        private const float THRESHOLD = 0.9f;
+        private float timerInterval => 1000 / Frequency;
+
+        private float weight;
+        private Vector3 mmScale;
+        private Vector3 targetPos;
+        private Vector3 lastPos;
+
+        float consumeDelta = 0;
+        float updateDelta = 0;
+        float updateMsAvg = 1;
+
+        
     }
 }
