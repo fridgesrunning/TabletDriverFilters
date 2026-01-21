@@ -6,8 +6,8 @@ using OpenTabletDriver.Plugin.Tablet;
 
 namespace TabletDriverFilters.Hawku
 {
-    [PluginName("Hawku Smoothing Filter")]
-    public class Smoothing : MillimeterAsyncPositionedPipelineElement
+    [PluginName("Hawku Smoothing Filter (M)")]
+    public class SmoothingM : MillimeterAsyncPositionedPipelineElement
     {
         public override PipelinePosition Position => PipelinePosition.PreTransform;
 

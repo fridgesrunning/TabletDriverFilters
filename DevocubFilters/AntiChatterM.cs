@@ -6,8 +6,8 @@ using OpenTabletDriver.Plugin.Tablet;
 
 namespace TabletDriverFilters.Devocub
 {
-    [PluginName("Devocub Antichatter")]
-    public class Antichatter : MillimeterAsyncPositionedPipelineElement
+    [PluginName("Devocub Antichatter (M)")]
+    public class AntichatterM : MillimeterAsyncPositionedPipelineElement
     {
         private const string LATENCY_TOOLTIP =
               "Smoothing latency\n"

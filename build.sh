@@ -4,5 +4,5 @@ output="./bin"
 rm -rvf $output
 
 for project in */*.csproj; do
-    dotnet build $project -o $output
+    dotnet build $project -c release -o $output
 done

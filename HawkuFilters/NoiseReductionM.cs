@@ -8,8 +8,8 @@ using TabletDriverFilters.Hawku.Utility;
 
 namespace OpenTabletDriver.Plugin
 {
-    [PluginName("Hawku Noise Reduction")]
-    public class NoiseReduction : MillimeterPositionedPipelineElement
+    [PluginName("Hawku Noise Reduction (M)")]
+    public class NoiseReductionM : MillimeterPositionedPipelineElement
     {
         private const string NOISEREDUCTION_TOOLTIP =
               "Noise Reduction Filter:\n"
